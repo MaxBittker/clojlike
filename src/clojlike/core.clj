@@ -47,14 +47,20 @@
        true
        (recur (+ o 1)))))
 
+(defn checkCollision
+  [[cx cy st lng] px py]
+  (and (= px cx) (< cy py) (> (+ cy lng) py)))
+
 (defn game
     []
     (loop [[x y] [0 (quot (second @screen-size) 2)]
            comets '()]
       (wipe)
-      (s/put-string scr x y "@"); {:fg :black :bg :yellow})
       (let [comets (filter (fn [[cx cy & rest]] (< cy (second @screen-size))) (map (fn [[cx cy st lng]] [cx (inc cy) (inc st) lng]) comets))]
         (doseq [c comets] (drawComet c))
+        (if (empty? (filter (fn [c] (checkCollision c x y)) comets))
+            (s/put-string scr x y "@")
+            (s/put-string scr x y "X" {:bg :red}))
         (s/redraw scr)
         (Thread/sleep 100)
         (let [key (s/get-key scr)]
