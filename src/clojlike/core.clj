@@ -10,7 +10,7 @@
 
 (def scr (s/get-screen :swing {:resize-listener handle-resize}))
 ; (def scr (s/get-screen ))
-
+(declare startScreen)
 
 (defn reflect
   [x y]
@@ -52,29 +52,33 @@
   (and (= px cx) (< cy py) (> (+ cy lng) py)))
 
 (defn game
-    []
+    [lvl]
     (loop [[x y] [0 (quot (second @screen-size) 2)]
            comets '()]
       (wipe)
-      (let [comets (filter (fn [[cx cy & rest]] (< cy (second @screen-size))) (map (fn [[cx cy st lng]] [cx (inc cy) (inc st) lng]) comets))]
+      (let [comets (filter (fn [[cx cy & rest]] (< cy (second @screen-size)))
+                      (map (fn [[cx cy st lng]] [cx (inc cy) (inc st) lng])
+                        (concat comets (take lvl (repeatedly newFlake)))))
+            hit (empty? (filter (fn [c] (checkCollision c x y)) comets))]
         (doseq [c comets] (drawComet c))
-        (if (empty? (filter (fn [c] (checkCollision c x y)) comets))
+        (s/put-string scr 0 0 (str "level: " lvl))
+        (if hit
             (s/put-string scr x y "@")
             (s/put-string scr x y "X" {:bg :red}))
         (s/redraw scr)
         (Thread/sleep 100)
         (let [key (s/get-key scr)]
-          (s/get-key scr)
-          (s/get-key scr)
-          (s/get-key scr)
-          (s/get-key scr)
-          (s/get-key scr)
-          (recur (map + [x y] (case key
-                                :up [0 -1]
-                                :left [-1 0]
-                                :down [0 1]
-                                :right [1 0]
-                                [0 0])) (cons (newFlake) comets))))))
+          (dotimes [d 5] (s/get-key scr))
+          (if (not hit)
+           (startScreen)
+           (if (= x (first @screen-size))
+             (game (inc lvl))
+             (recur (map + [x y] (case key
+                                    :up [0 -1]
+                                    :left [-1 0]
+                                    :down [0 1]
+                                    :right [1 0]
+                                    [0 0])) comets)))))))
 
 (defn frame
   [w h o]
@@ -89,7 +93,7 @@
     "PRESS ENTER" {:fg :black :bg :yellow})
   (s/redraw scr)
   (if (= :enter (s/get-key scr))
-    (game)
+    (game 1)
     (let [[w h ](s/get-size scr)]
       (recur w h (inc o)))))
 
