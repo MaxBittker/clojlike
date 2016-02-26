@@ -2,15 +2,15 @@
   (:gen-class))
 
 (require '[lanterna.screen :as s])
-
 (def screen-size (ref [80 24]))
 
 (defn handle-resize [cols rows]
   (dosync (ref-set screen-size [cols rows])))
 
 (def scr (s/get-screen :swing {:resize-listener handle-resize}))
-; (def scr (s/get-screen ))
+; (def scr (s/get-screen))
 (declare startScreen)
+(declare snakeFrame)
 
 (defn reflect
   [x y]
@@ -31,13 +31,12 @@
 
 (defn drawDot
     [x y o]
-    (let [ch (str (char (mod (+ o (* y (quot (first @screen-size) 2) x)) 60000)))]
+    (let [ch (str (char (mod (+ o (* y (quot (first @screen-size) 2) x)) 64000)))]
         (doseq [side (reflect x y)] (drawPixel side ch))))
-
 
 (defn newFlake
   []
-  [(rand-int (first @screen-size)) -10 (rand-int 60000) (+ 3(rand-int 7))])
+  [(rand-int (first @screen-size)) -10 (rand-int 64000) (+ 3(rand-int 7))])
 
 (defn drawComet
   [[x y state lng]]
@@ -51,34 +50,36 @@
   [[cx cy st lng] px py]
   (and (= px cx) (< cy py) (> (+ cy lng) py)))
 
+(defn tickComets
+  [x y lvl comets]
+  (filter (fn [[cx cy & rest]] (< cy (second @screen-size)))
+          (map (fn [[cx cy st lng]] [cx (inc cy) (inc st) lng])
+              (concat comets (take lvl (repeatedly newFlake))))))
+
 (defn game
     [lvl]
     (loop [[x y] [0 (quot (second @screen-size) 2)]
            comets '()]
       (wipe)
-      (let [comets (filter (fn [[cx cy & rest]] (< cy (second @screen-size)))
-                      (map (fn [[cx cy st lng]] [cx (inc cy) (inc st) lng])
-                        (concat comets (take lvl (repeatedly newFlake)))))
+      (let [comets (tickComets x y lvl comets)
             hit (empty? (filter (fn [c] (checkCollision c x y)) comets))]
         (doseq [c comets] (drawComet c))
         (s/put-string scr 0 0 (str "level: " lvl))
         (if hit
             (s/put-string scr x y "@")
-            (s/put-string scr x y "X" {:bg :red}))
+            (startScreen))
         (s/redraw scr)
         (Thread/sleep 100)
         (let [key (s/get-key scr)]
           (dotimes [d 5] (s/get-key scr))
-          (if (not hit)
-           (startScreen)
-           (if (= x (first @screen-size))
+          (if (= x (first @screen-size))
              (game (inc lvl))
              (recur (map + [x y] (case key
                                     :up [0 -1]
                                     :left [-1 0]
                                     :down [0 1]
                                     :right [1 0]
-                                    [0 0])) comets)))))))
+                                    [0 0])) comets))))))
 
 (defn frame
   [w h o]
@@ -90,10 +91,11 @@
   (s/put-string scr
     (quot (- w 10) 2)
     (mod (+  1 (quot o 15) (quot h 2)) h)
-    "PRESS ENTER" {:fg :black :bg :yellow})
+    "PRESS C or S" {:fg :black :bg :yellow})
   (s/redraw scr)
-  (if (= :enter (s/get-key scr))
-    (game 1)
+  (case  (s/get-key scr)
+    \c (game 1)
+    \s (snakeFrame)
     (let [[w h ](s/get-size scr)]
       (recur w h (inc o)))))
 
@@ -102,5 +104,46 @@
     (s/start scr)
     (let [[w h ](s/get-size scr)]
       (frame w h 1)))
+
+(defn drawSegment
+  [[x y]]
+  (s/put-string scr x y "▒"))
+
+(defn checkCollisionSnake
+  [[sx sy] [px py]]
+  (and (= sx px) (= sy py)))
+
+(defn snakeFrame
+  []
+  (s/start scr)
+  (loop [snake '([10 10])
+         dots   '()
+         dir     [1 0]
+         len     20]
+   (wipe)
+   (doseq [seg snake] (drawSegment seg))
+   (s/redraw scr)
+   (dotimes [d 5] (s/get-key scr))
+   (Thread/sleep 100)
+   (let [newdir (case (s/get-key scr)
+                   :up [0 -1]
+                   :left [-1 0]
+                   :down [0 1]
+                   :right [1 0]
+                   dir)
+         adjdir  (if (= [0 0](map + newdir dir))
+                    dir
+                    newdir)
+         snake (cons (map + (first snake) adjdir) snake)
+         hit (empty? (filter (fn [segment]
+                                (checkCollisionSnake segment (first snake)))
+                            (rest snake)))]
+    (if (not hit)
+     (startScreen)
+     (recur (take len snake) dots adjdir len)))))
+
+
+; (snakeFrame)
+
 
 (startScreen)
