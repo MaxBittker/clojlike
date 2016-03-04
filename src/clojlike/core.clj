@@ -139,6 +139,14 @@
   []
   [(rand-int (first @screen-size)) (rand-int (second @screen-size))])
 
+(defn inBounds
+  "check if point is inBounds"
+  [[x y]]
+  (not
+    (or
+      (> x (first @screen-size)) (< x 0) (> y (second @screen-size)) (< y 0))))
+
+
 (defn snakeFrame
   "snake game loop"
   []
@@ -163,15 +171,15 @@
                     dir
                     newdir)
          snake (cons (map + (first snake) adjdir) snake)
-         hit (empty? (filter (fn [segment]
-                                (checkCollisionSnake segment (first snake)))
-                            (rest snake)))
+         notHit (empty? (filter (fn [segment]
+                                  (checkCollisionSnake segment (first snake)))
+                              (rest snake)))
          ate (checkCollisionSnake dot (first snake))
          len (if ate (inc len) len)
          dot (if ate (newCoin) dot)]
-    (if (not hit)
+    (if (or (not notHit) (not (inBounds (first snake))))
      (startScreen)
      (recur (take len snake) dot adjdir len)))))
 
 
-; (startScreen)
+(startScreen)
