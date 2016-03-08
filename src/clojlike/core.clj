@@ -137,7 +137,10 @@
 (defn newCoin
   "create a new random point"
   []
-  [(rand-int (first @screen-size)) (rand-int (second @screen-size))])
+  (defn oneDim
+    [limit]
+    (+ 2 (rand-int (- limit 4))))
+  [(oneDim (first @screen-size)) (oneDim (second @screen-size))])
 
 (defn inBounds
   "check if point is inBounds"
