@@ -155,9 +155,11 @@
          dot   (newCoin)
          dir     [1 0]
          len     5]
+
    (wipe)
    (drawSegment dot)
    (doseq [seg snake] (drawSegment seg))
+   (s/put-string scr 0 0 (str "length: " (- len 5)))
    (safeRedraw)
    (dotimes [d 5] (s/get-key scr))
    (Thread/sleep 100)
